@@ -27,39 +27,58 @@
   </head>
 
   <body>
+    <form>
+      <label for="x_form">X:</label>
+      <input type="number" id="x_form" name="x_form" value="0"><br>
+  
+      <label for="y_form">Y:</label>
+      <input type="number" id="y_form" name="y_form" value="0"><br>
+  
+      <label for="z_form">Z:</label>
+      <input type="number" id="z_form" name="z_form" value="0"><br>
+  
+      <button type="button" onclick="moveCube()">Move</button>
+    </form>
     <canvas id="renderCanvas" touch-action="none"></canvas>
     <!-- touch-action="none" for best results from PEP -->
 
     <script>
       const canvas = document.getElementById("renderCanvas"); // Get the canvas element
       const engine = new BABYLON.Engine(canvas, true); // Generate the BABYLON 3D engine
-
+      
       // Add your code here matching the playground format
       const createScene = function () {
         const scene = new BABYLON.Scene(engine);
-
+        const params = {
+        x: 0,
+        y: 0,
+        z: 0,
+      };
+        
+      
         //BABYLON.MeshBuilder.CreateBox("box", {});
         const linedCube__bottom = BABYLON.MeshBuilder.CreateLines("borderedCube", 
         {
             points: [
-                new BABYLON.Vector3(0,0,0),
-                new BABYLON.Vector3(0,0,1),
-                new BABYLON.Vector3(1,0,1),
-                new BABYLON.Vector3(1,0,0),
-                new BABYLON.Vector3(0,0,0),
+                new BABYLON.Vector3(params.x,params.y,params.z),
+                new BABYLON.Vector3(params.x,params.y,params.z+1),
+                new BABYLON.Vector3(params.x+1,params.y,params.z+1),
+                new BABYLON.Vector3(params.x+1,params.y ,params.z),
+                new BABYLON.Vector3(params.x,params.y,params.z),
             ],
         }, 
         scene
     );
+    
 
     const linedCube__top = BABYLON.MeshBuilder.CreateLines("borderedCube", 
         {
             points: [
-                new BABYLON.Vector3(0,1,0),
-                new BABYLON.Vector3(0,1,1),
-                new BABYLON.Vector3(1,1,1),
-                new BABYLON.Vector3(1,1,0),
-                new BABYLON.Vector3(0,1,0),
+                new BABYLON.Vector3(params.x,params.y+1,params.z),
+                new BABYLON.Vector3(params.x,params.y+1,params.z+1),
+                new BABYLON.Vector3(params.x+1,params.y+1,params.z+1),
+                new BABYLON.Vector3(params.x+1,params.y+1,params.z),
+                new BABYLON.Vector3(params.x,params.y+1,params.z),
             ],
         }, 
         scene
@@ -67,20 +86,20 @@
 
     const cornerLinesCoords = [
         [
-            new BABYLON.Vector3(0,0,0),
-            new BABYLON.Vector3(0,1,0),
+            new BABYLON.Vector3(params.x,params.y,params.z),
+            new BABYLON.Vector3(params.x,1+params.y,params.z),
         ],
         [
-            new BABYLON.Vector3(0,0,1),
-            new BABYLON.Vector3(0,1,1),
+            new BABYLON.Vector3(params.x,params.y,1+params.z),
+            new BABYLON.Vector3(params.x,1+params.y,1+params.z),
         ],
         [
-            new BABYLON.Vector3(1,0,1),
-            new BABYLON.Vector3(1,1,1),
+            new BABYLON.Vector3(1+params.x,params.y,1+params.z),
+            new BABYLON.Vector3(1+params.x,1+params.y,1+params.z),
         ],
         [
-            new BABYLON.Vector3(1,0,0),
-            new BABYLON.Vector3(1,1,0),
+            new BABYLON.Vector3(1+params.x,params.y,params.z),
+            new BABYLON.Vector3(1+params.x,1+params.y,params.z),
         ],
     ];
 
@@ -91,6 +110,7 @@
             }, 
             scene
         );
+        
     });
 
 
@@ -99,6 +119,7 @@
             camera.attachControl(canvas, true);
             const light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(1, 1, 0));
 
+           
             return scene;
           };
 
@@ -109,10 +130,38 @@
         scene.render();
       });
 
-      // Watch for browser/canvas resize events
       window.addEventListener("resize", function () {
         engine.resize();
       });
+
+      function moveCube() {
+        const x = parseFloat(document.getElementById("x_form").value);
+        const y = parseFloat(document.getElementById("y_form").value);
+        const z = parseFloat(document.getElementById("z_form").value);
+
+        linedCube__bottom.position = new BABYLON.Vector3(x, y, z);
+        linedCube__top.position = new BABYLON.Vector3(x, y + 1, z);
+        
+        const cornerLines = scene.getMeshesByTags("borderedCube");
+         cornerLines.forEach((cornerLine) => {
+          const cornerLineCoordinateArray = cornerLine.getVerticesData(
+            BABYLON.VertexBuffer.PositionKind
+          );
+          cornerLineCoordinateArray[0] = x;
+          cornerLineCoordinateArray[1] = y;
+          cornerLineCoordinateArray[2] = z;
+          cornerLineCoordinateArray[3] = x;
+          cornerLineCoordinateArray[4] = y + 1;
+          cornerLineCoordinateArray[5] = z;
+  
+          cornerLine.updateVerticesData(
+            BABYLON.VertexBuffer.PositionKind,
+            cornerLineCoordinateArray
+          );
+        });
+  
+        scene.render();
+      }
     </script>
   </body>
 </html>
