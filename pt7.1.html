@@ -11,54 +11,85 @@
     <canvas id="renderCanvas"></canvas>
 
     <script src="https://cdn.babylonjs.com/babylon.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dat.gui@0.7.7/build/dat.gui.min.js"></script>
+
     <script>
-        // Создаем сцену и камеру
+        // Создаем сцену
         var canvas = document.getElementById("renderCanvas");
         var engine = new BABYLON.Engine(canvas, true);
         var scene = new BABYLON.Scene(engine);
-        var camera = new BABYLON.ArcRotateCamera("camera", 0, 0, 10, BABYLON.Vector3.Zero(), scene);
+
+        // Создаем камеру
+        var camera = new BABYLON.ArcRotateCamera("Camera", 0, 0, 10, BABYLON.Vector3.Zero(), scene);
         camera.attachControl(canvas, true);
 
+        // Создаем свет
+        var light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
+
         // Создаем оси X и Y
-        var xAxis = BABYLON.MeshBuilder.CreateLines("xAxis", {points: [new BABYLON.Vector3(-5, 0, 0), new BABYLON.Vector3(5, 0, 0)]}, scene);
-        var yAxis = BABYLON.MeshBuilder.CreateLines("yAxis", {points: [new BABYLON.Vector3(0, -5, 0), new BABYLON.Vector3(0, 5, 0)]}, scene);
+        var axisX = BABYLON.MeshBuilder.CreateLines("axisX", {points: [
+            new BABYLON.Vector3(-10, 0, 0),
+            new BABYLON.Vector3(10, 0, 0)
+        ]}, scene);
+        axisX.color = new BABYLON.Color3(1, 0, 0);
 
-        // Добавляем стрелки на концах осей
-        var xArrow = BABYLON.MeshBuilder.CreateCylinder("xArrow", {height: 0.5, diameterTop: 0, diameterBottom: 0.2}, scene);
-        xArrow.rotation.x = Math.PI / 2;
-        xArrow.position.x = 5;
-        var yArrow = BABYLON.MeshBuilder.CreateCylinder("yArrow", {height: 0.5, diameterTop: 0, diameterBottom: 0.2}, scene);
-        yArrow.rotation.z = -Math.PI / 2;
-        yArrow.position.y = 5;
-        xArrow.parent = xAxis;
-        yArrow.parent = yAxis;
+        var axisY = BABYLON.MeshBuilder.CreateLines("axisY", {points: [
+            new BABYLON.Vector3(0, -1, 0),
+            new BABYLON.Vector3(0, 1, 0)
+        ]}, scene);
+        axisY.color = new BABYLON.Color3(0, 1, 0);
 
-        // Добавляем подписи к осям
-        var xLabel = new BABYLON.GUI.TextBlock();
-        xLabel.text = "X";
-        xLabel.color = "red";
-        xLabel.fontSize = 24;
-        xLabel.horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_RIGHT;
-        xLabel.verticalAlignment = BABYLON.GUI.Control.VERTICAL_ALIGNMENT_CENTER;
-        xLabel.paddingRight = "10px";
-        xLabel.paddingTop = "10px";
-        canvas.addControl(xLabel);
-        var yLabel = new BABYLON.GUI.TextBlock();
-        yLabel.text = "Y";
-        yLabel.color = "green";
-        yLabel.fontSize = 24;
-        yLabel.horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_CENTER;
-        yLabel.verticalAlignment = BABYLON.GUI.Control.VERTICAL_ALIGNMENT_BOTTOM;
-        yLabel.paddingBottom = "10px";
-        canvas.addControl(yLabel);
+        // Создаем форму для изменения параметров
+        var gui = new dat.GUI();
+        var parameters = {
+            mean: 0,
+            standardDeviation: 1,
+        };
 
-        // Задаем цвета осей
-        xAxis.color = new BABYLON.Color3(1, 0, 0); // Красный цвет для оси X
-        yAxis.color = new BABYLON.Color3(0, 1, 0); // Зеленый цвет для оси Y
+        // Изменение значения mean
+        gui.add(parameters, "mean", -10, 10).onFinishChange(function() {
+            // Обработка изменения значения mean
+            drawGraph();
+        });
+
+        // Изменение значения standardDeviation
+        gui.add(parameters, "standardDeviation", 0.1, 10).onFinishChange(function() {
+            // Обработка изменения значения standardDeviation
+            drawGraph();
+        });
+
+        // Создаем функцию для отрисовки графика
+        function drawGraph() {
+            // Удаляем предыдущий график
+            scene.meshes.forEach(function(mesh) {
+                if (mesh.name !== "axisX" && mesh.name !== "axisY") {
+                    mesh.dispose();
+                }
+            });
+
+            // Рисуем новый график
+            var data = [];
+            for (var i = -10; i <= 10; i += 0.1) {
+                var x = i;
+                var y = (1 / (parameters.standardDeviation * Math.sqrt(2 * Math.PI))) * Math.exp(-Math.pow(x - parameters.mean, 2) / (2 * Math.pow(parameters.standardDeviation, 2)));
+                data.push(new BABYLON.Vector3(x, y, 0));
+            }
+
+            var curve = BABYLON.MeshBuilder.CreateLines("curve", {points: data}, scene);
+            curve.color = new BABYLON.Color3(1, 1, 1);
+        }
+
+        // Отрисовываем график в начале работы скрипта
+        drawGraph();
 
         // Запускаем рендеринг сцены
-        engine.runRenderLoop(function() {
+        engine.runRenderLoop(function () {
             scene.render();
+        });
+
+        // Обрабатываем изменение размера окна браузера
+        window.addEventListener("resize", function () {
+            engine.resize();
         });
     </script>
 </body>
