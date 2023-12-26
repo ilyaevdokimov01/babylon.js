@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Scene</title>
+    <script src="https://preview.babylonjs.com/babylon.js"></script>
+    <script src="https://preview.babylonjs.com/gui/babylon.gui.min.js"></script>
+</head>
+<body>
+    <canvas id="renderCanvas"></canvas>
+    <script>
+        var canvas = document.getElementById("renderCanvas");
+        var engine = new BABYLON.Engine(canvas, true);
+        var scene = createScene();
+
+        function createScene() {
+            var scene = new BABYLON.Scene(engine);
+            scene.clearColor = new BABYLON.Color3(1, 1, 1, 0.7);
+
+            var camera = new BABYLON.ArcRotateCamera("camera", -Math.PI / 2, Math.PI / 2.5, 3, new BABYLON.Vector3(0, 0, 0));
+            camera.attachControl(canvas, true);
+
+            var material = new BABYLON.StandardMaterial("wireframeMaterial", scene);
+            material.wireframe = true;
+
+            var edgeLength = parseFloat(prompt("Enter the length of the cube's edge:"));
+
+            var box = BABYLON.MeshBuilder.CreateBox("box", { size: edgeLength }, scene);
+            box.material = material;
+
+            engine.runRenderLoop(function () {
+                scene.render();
+            });
+
+            window.addEventListener("unload", function () {
+                box.dispose();
+                scene.dispose();
+            });
+
+            createForm(box);
+
+            return scene;
+        }
+
+        function createForm(box) {
+            var form = new BABYLON.GUI.AdvancedDynamicTexture.CreateFullscreenUI("UI");
+
+            var header = new BABYLON.GUI.TextBlock();
+            header.text = "Rotation Angle";
+            header.color = "black";
+            header.fontSize = 24;
+            header.top = "10px";
+            form.addControl(header);
+
+            var editBox = new BABYLON.GUI.InputText();
+            editBox.width = "200px";
+            editBox.height = "40px";
+            editBox.color = "white";
+            editBox.background = "black";
+            editBox.top = "50px";
+            form.addControl(editBox);
+
+            var button = BABYLON.GUI.Button.CreateSimpleButton("copyButton", "Copy Cube");
+            button.width = "150px";
+            button.height = "40px";
+            button.color = "white";
+            button.background = "black";
+            button.top = "100px";
+            form.addControl(button);
+
+            editBox.onTextChangedObservable.add(e=>{
+                var s = parseFloat(e.text);
+                box.rotation.y = s;
+            });
+
+            button.onPointerUpObservable.add(e => {
+                var copiedBox = box.clone("copiedBox");
+                copiedBox.position = new BABYLON.Vector3(3, 0, 0);
+            });
+        }
+    </script>
+</body>
+</html>

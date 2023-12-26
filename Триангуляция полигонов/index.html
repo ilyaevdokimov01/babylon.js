@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+
+        <title>Babylon.js sample code</title>
+
+        <!-- Babylon.js -->
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.6.2/dat.gui.min.js"></script>
+        <script src="https://assets.babylonjs.com/generated/Assets.js"></script>
+        <script src="https://preview.babylonjs.com/ammo.js"></script>
+        <script src="https://preview.babylonjs.com/cannon.js"></script>
+        <script src="https://preview.babylonjs.com/Oimo.js"></script>
+        <script src="https://preview.babylonjs.com/earcut.min.js"></script>
+        <script src="https://preview.babylonjs.com/babylon.js"></script>
+        <script src="https://preview.babylonjs.com/materialsLibrary/babylonjs.materials.min.js"></script>
+        <script src="https://preview.babylonjs.com/proceduralTexturesLibrary/babylonjs.proceduralTextures.min.js"></script>
+        <script src="https://preview.babylonjs.com/postProcessesLibrary/babylonjs.postProcess.min.js"></script>
+        <script src="https://preview.babylonjs.com/loaders/babylonjs.loaders.js"></script>
+        <script src="https://preview.babylonjs.com/serializers/babylonjs.serializers.min.js"></script>
+        <script src="https://preview.babylonjs.com/gui/babylon.gui.min.js"></script>
+        <script src="https://preview.babylonjs.com/inspector/babylon.inspector.bundle.js"></script>
+
+        <style>
+            html, body {
+                overflow: hidden;
+                width: 100%;
+                height: 100%;
+                margin: 0;
+                padding: 0;
+            }
+
+            #renderCanvas {
+                width: 100%;
+                height: 100%;
+                touch-action: none;
+            }
+        </style>
+    </head>
+<body>
+    <canvas id="renderCanvas"></canvas>
+    <script>
+        var canvas = document.getElementById("renderCanvas");
+
+        var startRenderLoop = function (engine, canvas) {
+            engine.runRenderLoop(function () {
+                if (sceneToRender && sceneToRender.activeCamera) {
+                    sceneToRender.render();
+                }
+            });
+        }
+
+        var engine = null;
+        var scene = null;
+        var sceneToRender = null;
+        var createDefaultEngine = function() { return new BABYLON.Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true,  disableWebGL2Support: false}); };
+        var createScene = function () {
+    var scene = new BABYLON.Scene(engine); //базовая сцена
+
+    var camera = new BABYLON.FreeCamera("camera1", new BABYLON.Vector3(10, 10, -25), scene); //свободная камера
+    //camera.setTarget(BABYLON.Vector3.Zero()); //нацеливание камера на начало сцены
+    camera.inputs.addMouseWheel();
+    camera.attachControl(canvas, true); //прикрепение камеры к холсту
+
+
+
+    var light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene); //полусферический свет, направоенный в небо
+    light.intensity = 0.7; //интенсивность света
+
+    const myPoints = [     //точки для изначального контура
+        new BABYLON.Vector3(2, 9),
+        new BABYLON.Vector3(5, 8),
+        new BABYLON.Vector3(1, 13),
+        new BABYLON.Vector3(0, 16),
+        new BABYLON.Vector3(7, 10),
+        new BABYLON.Vector3(6, 14),
+        new BABYLON.Vector3(8, 10),
+        new BABYLON.Vector3(14, 9),
+        new BABYLON.Vector3(12, 14),
+        new BABYLON.Vector3(10, 12),
+        new BABYLON.Vector3(13, 17),
+        new BABYLON.Vector3(20, 8),
+        new BABYLON.Vector3(12, 3),
+        new BABYLON.Vector3(10, 7),
+        new BABYLON.Vector3(5, 5),
+        new BABYLON.Vector3(2, 9),
+    ]
+
+    const lines = BABYLON.MeshBuilder.CreateLines("lines", { points: myPoints }); //проведение линий через точки myPoints
+
+
+    function drawDiagonal(x1, y1, x2, y2, x3, y3) {  //соединение вершин 
+        const pointsTriangle = [
+            new BABYLON.Vector3(x1, y1, 0),
+            new BABYLON.Vector3(x3, y3, 0),
+        ]
+
+        const linesDiagonal = BABYLON.MeshBuilder.CreateLines("linesDiag", { points: pointsTriangle });
+        linesDiagonal.color = BABYLON.Color3.Red();
+    }
+
+
+    function calculateSquare(A, B, C) { //площадь треугольника
+        return 1 / 2 * Math.abs((B.x - A.x) * (C.y - A.y) - (C.x - A.x) * (B.y - A.y));
+    }
+
+    function inTriangle(A, B, C, D) { //проверка пренадлежности точки треугольнику
+        return calculateSquare(A, B, C) === calculateSquare(A, B, D) + calculateSquare(A, C, D) + calculateSquare(B, D, C);
+    }
+
+    function hasPointOfPolygon(points) { //проверка наличия других точек внутри рассматриваемого треугольника
+        const A = points[0],
+            B = points[1],
+            C = points[2];
+
+        for (let p = 3; p < points.length; p++) {
+            if (inTriangle(A, B, C, points[p])) return true;
+        }
+
+        return false;
+    }
+
+    // Левая тройка векторов?
+    function isLeft(A, B, C) {
+        const AB = {
+            x: B.x - A.x,
+            y: B.y - A.y
+        },
+            AC = {
+                x: C.x - A.x,
+                y: C.y - A.y
+            };
+
+        return AB.x * AC.y - AC.x * AB.y < 0;
+    }
+
+    // Триангуляция
+    function triangulate() {
+        myPoints.pop(); //удаление последнего элемента массива
+        while (myPoints.length >= 3) {
+            if (isLeft(myPoints[0], myPoints[1], myPoints[2]) && !hasPointOfPolygon(myPoints)) {
+
+                const x1 = myPoints[0].x,
+                    y1 = myPoints[0].y;
+                const x2 = myPoints[1].x,
+                    y2 = myPoints[1].y;
+                const x3 = myPoints[2].x,
+                    y3 = myPoints[2].y;
+                drawDiagonal(x1, y1, x2, y2, x3, y3);
+
+                myPoints.splice(1, 1); //удаление 1ого элемента (1-номер, 1-кол-во)
+                let tmp = myPoints.shift(); //удаление 0ого элемента массива
+                myPoints.push(tmp); //добавить в конец
+            } else {
+                const tmp = myPoints[0];
+                myPoints.shift();
+                myPoints.push(tmp);
+            }
+        }
+    }
+
+    triangulate();
+    return scene;
+};
+                window.initFunction = async function() {
+                    
+                    
+                    var asyncEngineCreation = async function() {
+                        try {
+                        return createDefaultEngine();
+                        } catch(e) {
+                        console.log("the available createEngine function failed. Creating the default engine instead");
+                        return createDefaultEngine();
+                        }
+                    }
+
+                    window.engine = await asyncEngineCreation();
+        if (!engine) throw 'engine should not be null.';
+        startRenderLoop(engine, canvas);
+        window.scene = createScene();};
+        initFunction().then(() => {sceneToRender = scene                    
+        });
+
+        // Resize
+        window.addEventListener("resize", function () {
+            engine.resize();
+        });
+    </script>
+</body>
+</html>

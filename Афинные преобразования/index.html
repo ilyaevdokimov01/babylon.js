@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+
+        <title>Babylon.js sample code</title>
+
+        <!-- Babylon.js -->
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.6.2/dat.gui.min.js"></script>
+        <script src="https://assets.babylonjs.com/generated/Assets.js"></script>
+        <script src="https://preview.babylonjs.com/ammo.js"></script>
+        <script src="https://preview.babylonjs.com/cannon.js"></script>
+        <script src="https://preview.babylonjs.com/Oimo.js"></script>
+        <script src="https://preview.babylonjs.com/earcut.min.js"></script>
+        <script src="https://preview.babylonjs.com/babylon.js"></script>
+        <script src="https://preview.babylonjs.com/materialsLibrary/babylonjs.materials.min.js"></script>
+        <script src="https://preview.babylonjs.com/proceduralTexturesLibrary/babylonjs.proceduralTextures.min.js"></script>
+        <script src="https://preview.babylonjs.com/postProcessesLibrary/babylonjs.postProcess.min.js"></script>
+        <script src="https://preview.babylonjs.com/loaders/babylonjs.loaders.js"></script>
+        <script src="https://preview.babylonjs.com/serializers/babylonjs.serializers.min.js"></script>
+        <script src="https://preview.babylonjs.com/gui/babylon.gui.min.js"></script>
+        <script src="https://preview.babylonjs.com/inspector/babylon.inspector.bundle.js"></script>
+
+        <style>
+            html, body {
+                overflow: hidden;
+                width: 100%;
+                height: 100%;
+                margin: 0;
+                padding: 0;
+            }
+
+            #renderCanvas {
+                width: 100%;
+                height: 100%;
+                touch-action: none;
+            }
+        </style>
+    </head>
+<body>
+    <canvas id="renderCanvas"></canvas>
+    <script>
+        // получаем канвас на странице
+        var canvas = document.getElementById("renderCanvas");
+
+        // запускаем двигатель жиги
+        var startRenderLoop = function (engine, canvas) {
+            engine.runRenderLoop(function () {
+                if (sceneToRender && sceneToRender.activeCamera) {
+                    sceneToRender.render();
+                }
+            });
+        }
+
+        var engine = null;
+        var scene = null;
+        var sceneToRender = null;
+        var createDefaultEngine = function() { return new BABYLON.Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true,  disableWebGL2Support: false}); };
+        var createScene = function () {
+            // отрисовка сцены
+            var scene = new BABYLON.Scene(engine);
+
+            // добавляем свет
+            var light = new BABYLON.PointLight(
+                "Omni",
+                new BABYLON.Vector3(0, 100, 100),
+                scene
+            );
+
+            // добавляем камеру
+            const camera = new BABYLON.ArcRotateCamera(
+                "camera",
+                -Math.PI / 1.5, Math.PI / 2.2, 10,
+                new BABYLON.Vector3(0, 0, 0)
+            );
+            camera.upperBetaLimit = Math.PI / 2.2;
+            camera.attachControl(canvas, true);
+
+            // оси координат
+            const axes = new BABYLON.AxesViewer(scene, 2)
+
+            // параметры
+            let start_x = 0.0;      // начало прямоугольника по X
+            let start_y = 0.0;      // начало прямоугольника по Y
+            let scale_y = 1.0;      // начальная высота
+            let scale_x = 1.0;      // начальная ширина
+
+            // параметры для зеркала
+            let check = 1;          // зеркалировать вниз или в сторону? 1 - по сторонам, -1 - вверх/вниз
+            let isRightSide = true; // отзералено ли в сторону? // TODO своё
+            let isBottomSide = false; // отзеркалено ли вниз/вверх? // TODO своё
+            let divided_x = 0;      // точка деления по X для линии-высоты
+            let divided_y = 0;      // точка деления по Y для линии-высоты
+            let alpha1 = 0          // угол поворота
+
+            // создание интерфейса
+            var gui = new dat.GUI();
+            gui.domElement.style.marginTop = "100px";
+            gui.domElement.id = "datGUI";
+            var options = {
+                scale_x: 1.0,
+                scale_y: 1.0,
+                alpha: 0.0,
+                start_x: 0.0,
+                start_y: 0.0,
+            }
+
+            // advancedTexture - блок с чекбоксом и кнопкой
+            var advancedTexture = BABYLON.GUI.AdvancedDynamicTexture.CreateFullscreenUI("UI");
+
+            // чекбокс для зекрала
+            var checkbox = new BABYLON.GUI.Checkbox();
+            checkbox.width = "20px";
+            checkbox.height = "20px";
+            checkbox.isChecked = false;
+            checkbox.color = "white";
+            checkbox.left = "-100px"
+            checkbox.horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_RIGHT;
+
+            checkbox.onIsCheckedChangedObservable.add(function (value) {
+                check *= -1;
+                console.log("Отражаем зеркально по оси Y модель...")
+                // if (line) line.dispose();
+            });
+            advancedTexture.addControl(checkbox);
+
+            var header = new BABYLON.GUI.TextBlock();
+            header.text = "swap to y";
+            header.width = "100px";
+            header.right = "20px"
+            header.color = "white";
+            header.horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_RIGHT;
+            advancedTexture.addControl(header);
+
+            var button1 = BABYLON.GUI.Button.CreateSimpleButton("but1", 'Reflect');
+            button1.width = '110px';
+            button1.height = '30px';
+            button1.color = "white";
+            button1.horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_RIGHT;
+            button1.top = "40px"
+            button1.fontSize = 20;
+            button1.thickness = 1;
+            button1.background = "black";
+            button1.left = "-10px";
+            advancedTexture.addControl(button1);
+
+            // обработка нажатия на кнопку, запуск зеркала
+            button1.onPointerUpObservable.add(function () {
+                if (check === -1) isBottomSide = !isBottomSide;
+                else isRightSide = !isRightSide;
+
+                // если checkbox "swap to y" не выбран
+                if (check === 1) {
+                    recalculate_x();
+                }
+                // если checkbox "swap to y" не выбран
+                else {
+                    recalculate_y();
+                }
+            });
+
+            // обработка нажатия клавиши мыши, создает линию при нажатии на mesh
+            scene.onPointerDown = function (evt, pickResult) {
+                //строить ли линию
+                let continueCreating = false;
+                //если угол 0 или 360, то строим 
+                if (alpha1 === 0 || alpha1 === 360) continueCreating = true;
+                if (!continueCreating) return;
+                if (pickResult.hit) {
+                    const linepoints = [];
+
+                    if (isBottomSide) {
+                        divided_y = pickResult.pickedPoint.y;
+
+                        // TODO проверка на выход за размеры
+                        if (divided_y > -start_y || divided_y < -start_y-scale_y) {
+                            alert("Вышли за границу модели");
+                            return;
+                        }
+                        if (line) line.dispose()
+
+                        if (isRightSide) {
+                            linepoints.push(new BABYLON.Vector3(start_x, pickResult.pickedPoint.y, 0))
+                            linepoints.push(new BABYLON.Vector3(start_x + scale_x, pickResult.pickedPoint.y, 0))
+                        }
+                        else {
+                            linepoints.push(new BABYLON.Vector3(-start_x, pickResult.pickedPoint.y, 0))
+                            linepoints.push(new BABYLON.Vector3(-start_x - scale_x, pickResult.pickedPoint.y, 0))
+                        }
+                    }
+                    else {
+                        divided_x = pickResult.pickedPoint.x;
+
+                        // TODO проверка на выход за размеры
+                        if (isRightSide && (divided_x > start_x + scale_x || divided_x < start_x)) {
+                            alert("Вышли за границу модели")
+                            return
+                        }
+                        if (!isRightSide && (divided_x > -start_x || divided_x < -start_x-scale_x)) {
+                            alert("Вышли за границу модели")
+                            return;
+                        }
+
+                        if (line) line.dispose()
+
+                        linepoints.push(new BABYLON.Vector3(pickResult.pickedPoint.x, scale_y + start_y, 0))
+                        linepoints.push(new BABYLON.Vector3(pickResult.pickedPoint.x, start_y, 0))
+                    }
+                    line = BABYLON.MeshBuilder.CreateLines("lines", { points: linepoints }, scene);
+                }
+            }
+
+            // копирует массив для вращения
+            function copy() {
+                return [
+                    new BABYLON.Vector3(start_x, start_y, 0),
+                    new BABYLON.Vector3(start_x, start_y + scale_y, 0),
+                    new BABYLON.Vector3(start_x + scale_x, start_y + scale_y, 0),
+                    new BABYLON.Vector3(start_x + scale_x, start_y, 0),
+                    new BABYLON.Vector3(start_x, start_y, 0),
+                ];
+            }
+
+            // функция вращения
+            function rotate() {
+                mesh.dispose();
+                if (line) line.dispose();               
+                points_rot = Array.from(copy())
+                for (j = 0; j < 5; j++) {
+                    points_rot[j].x = points[j].x * Math.cos(alpha1 / 180 * Math.PI) + points[j].y * Math.sin(alpha1 / 180 * Math.PI)
+                }
+                for (i = 0; i < 5; i++) {
+                    points_rot[i].y = - points[i].x * Math.sin(alpha1 / 180 * Math.PI) + points[i].y * Math.cos(alpha1 / 180 * Math.PI)
+                }
+                mesh = BABYLON.MeshBuilder.CreateLines("square", { points: points_rot }, scene);
+            }
+
+            //функция пересчета при изменении X
+            function recalculate_x() {
+                // console.log("recaltulate x");
+
+                mesh.dispose();
+                if (line) {
+                    line.dispose();
+                }
+
+                // TODO нормальный scale_x при зеркалировании
+                if (isRightSide) {
+                    points[0].x = start_x;
+                    points[1].x = start_x;
+                    points[2].x = start_x + scale_x;
+                    points[3].x = start_x + scale_x;
+                    points[4].x = start_x;
+                }
+                // TODO нормальный scale_x при зеркалировании
+                else {
+                    points[0].x = -start_x;
+                    points[1].x = -start_x;
+                    points[2].x = -start_x - scale_x;
+                    points[3].x = -start_x - scale_x;
+                    points[4].x = -start_x;
+                }
+
+                rotate()
+                // mesh = BABYLON.MeshBuilder.CreateLines("square", { points: points }, scene);
+            }
+            //функция пересчета при изменении Y
+            function recalculate_y() {
+                mesh.dispose();
+                if (line) {
+                    line.dispose();
+                }
+
+                // если модель сверху
+                if (!isBottomSide) {
+                    points[0].y = start_y;
+                    points[1].y = start_y + scale_y;
+                    points[2].y = start_y + scale_y;
+                    points[3].y = start_y;
+                    points[4].y = start_y;
+                }
+                else {
+                    points[0].y = -start_y;
+                    points[1].y = -start_y - scale_y;
+                    points[2].y = -start_y - scale_y;
+                    points[3].y = -start_y;
+                    points[4].y = -start_y;
+                }
+
+                rotate()
+                // mesh = BABYLON.MeshBuilder.CreateLines("square", { points: points }, scene);
+            }
+
+            // сам массив точек для построения
+            var points = [
+                // 0, 0
+                new BABYLON.Vector3(start_x, start_y, 0),
+
+                // 0, 1
+                new BABYLON.Vector3(start_x, start_y + scale_y, 0),
+
+                // 1, 1
+                new BABYLON.Vector3(start_x + scale_x, start_y + scale_y, 0),
+
+                // 1, 0
+                new BABYLON.Vector3(start_x + scale_x, start_y, 0),
+
+                // 0, 0
+                new BABYLON.Vector3(start_x, start_y, 0),
+            ]
+
+            // сам прямоугольник
+            let mesh = BABYLON.MeshBuilder.CreateLines("square", { points: points }, scene);
+
+            // var line = BABYLON.MeshBuilder.CreateLines("lines", { points: points }, scene);
+            // переменная для разделяющей
+            let line = undefined;
+
+            //обработка изменений в GUI
+            gui.add(options, "scale_x", 0.1, 20).onChange(function (value) {
+                scale_x = value
+                recalculate_x()
+            });
+
+            gui.add(options, "scale_y", 0.1, 20).onChange(function (value) {
+                scale_y = value
+                recalculate_y()
+            });
+
+            gui.add(options, "alpha", 0, 360).onChange(function (value) {
+                alpha1 = value
+                rotate()
+            });
+
+            gui.add(options, "start_x", -10.0, 10.0).onChange(function (value) {
+                start_x = value
+                recalculate_x()
+            });
+            gui.add(options, "start_y", -10.0, 10.0).onChange(function (value) {
+                start_y = value
+                recalculate_y()
+            });
+
+            return scene;
+        }
+
+        window.initFunction = async function() {
+            var asyncEngineCreation = async function() {
+                try {
+                return createDefaultEngine();
+                } catch(e) {
+                console.log("the available createEngine function failed. Creating the default engine instead");
+                return createDefaultEngine();
+                }
+            }
+
+            window.engine = await asyncEngineCreation();
+
+            if (!engine) throw 'engine should not be null.';
+            startRenderLoop(engine, canvas);
+            window.scene = createScene();
+        };
+
+        initFunction().then(() => {
+            sceneToRender = scene
+        });
+
+        // Resize
+        window.addEventListener("resize", function () {
+            engine.resize();
+        });
+    </script>
+</body>
+</html>

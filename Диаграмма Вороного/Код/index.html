@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>Babylon Template</title>
+
+    <style>
+        html,
+        body {
+            overflow: hidden;
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+        }
+
+        #renderCanvas {
+            width: 100%;
+            height: 100%;
+            touch-action: none;
+            position: absolute;
+        }
+    </style>
+
+    <script src="https://cdn.babylonjs.com/babylon.js"></script>
+    <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+    <script src="https://code.jquery.com/pep/0.4.3/pep.js"></script>
+    <script src="https://cdn.babylonjs.com/gui/babylon.gui.js"></script>
+    <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+    <canvas id="renderCanvas" touch-action="none"></canvas>
+
+    <div class="modal" id="modal">
+        <button class="modal-close" onclick="closeModal()">X</button>
+    
+        <div class="modal-content">
+            <p>
+                Babylon.js — легковесный кроссбраузерный JavaScript-фреймворк, 
+                использующий API WebGL для отображения 2D и 3D-графики в браузере без использования каких-либо сторонних плагинов и дополнений. 
+                Babylon.js использует элемент HTML5 Canvas.
+            </p>
+            <p>
+                На основе фреймворка был реализован алгоритм разбиения плоскости на области "Диаграмма Вороного".
+                Диаграмма Вороного конечного множества точек S на плоскости представляет такое разбиение плоскости, 
+                при котором каждая область этого разбиения образует множество точек, более близких к одному из элементов множества S, 
+                чем к любому другому элементу множества
+            </p>
+        </div>
+      </div>
+  
+      <div class="background" onclick="closeModal()"></div>
+
+    <script src="/modal.js"></script>
+
+    <script async>
+
+        run();
+
+        async function run()
+        {
+
+        
+
+        const canvas = document.getElementById("renderCanvas"); // Get the canvas element
+        const engine = new BABYLON.Engine(canvas, true); // Generate the BABYLON 3D engine
+
+
+        BABYLON.AbstractMesh.prototype.move = function (axis, amt, speed) {
+    var ease = new BABYLON.CubicEase();
+    ease.setEasingMode(BABYLON.EasingFunction.EASINGMODE_EASEINOUT);
+	BABYLON.Animation.CreateAndStartAnimation('at5', this, 'position.' + axis, speed, 120, this.position[axis], this.position[axis]+amt, 0, ease);
+}
+
+        function sleep(time) {
+            return new Promise((resolve) => {
+                setTimeout(resolve, time || 1000);
+            });
+        }
+
+let createScene = async function () {
+            // This creates a basic Babylon Scene object (non-mesh)
+            let scene = new BABYLON.Scene(engine);
+
+            // This creates a light, aiming 0,1,0 - to the sky (non-mesh)
+            let light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0.5, 1, 0.5), scene);
+
+            // Default intensity is 1. Let's dim the light a small amount
+            light.intensity = 0.7;
+
+
+            let width = 3;
+            let height = 2;
+
+            // Our built-in 'ground' shape.
+            let ground = BABYLON.MeshBuilder.CreateGround("ground", { width, height, updatable: true }, scene);
+            ground.position = new BABYLON.Vector3(width / 2, 0, height / 2)
+
+            let transparentMaterial = new BABYLON.StandardMaterial("t", scene);
+
+            transparentMaterial.diffuseTexture = new BABYLON.Texture("map.png", scene);
+            transparentMaterial.alpha = 0.5;
+
+            ground.material = transparentMaterial
+
+            let camera = new BABYLON.ArcRotateCamera("Camera", 0, 0, 10, new BABYLON.Vector3(0, 0, 0), scene);
+
+            // Positions the camera overwriting alpha, beta, radius
+            camera.setPosition(new BABYLON.Vector3(5 + width, 10, 5 + height));
+
+            // This attaches the camera to the canvas
+            camera.attachControl(canvas, true);
+            camera.target = ground;
+            camera.wheelPrecision = 50;
+            camera.minZ = 0.1;
+
+            let areas = [];
+
+
+            let isDown = false;
+            let isDrag = false
+
+            scene.onPointerDown = () => {
+                isDown = true;
+            }
+
+            scene.onPointerMove = (e) => {
+                if (Math.abs(e.movementX) < 1 || Math.abs(e.movementY) < 1) {
+                    return;
+                }
+                isDrag = isDown;
+            }
+
+            scene.onPointerUp = (e, pickResult) => {
+                if (!pickResult.hit) {
+                    return;
+                }
+
+                let isVoronoiObj = pickResult.pickedMesh.name.includes("area");
+
+                if (e.button == 0 && !isVoronoiObj) {
+
+                    if (isDrag) {
+                        isDrag = false;
+
+                        isDown = false;
+
+                        return;
+                    }
+
+                    areas.push(addArea(pickResult.pickedPoint, areas.length + 1));
+                }
+                else if (e.button == 2 && isVoronoiObj) {
+                    let index = areas.findIndex(a => a.spherePoint.name == pickResult.pickedMesh.name);
+
+                    let areaToDelete = areas[index];
+
+                    disposeArea(areaToDelete)
+
+                    areas.splice(index, 1);
+                }
+                else {
+                    return;
+                }
+
+                isDown = false;
+
+                updateVoronoiAreas(areas, width, height);
+
+                drawVoronoiDiagram(areas, scene);
+            }
+
+            let advancedTexture = BABYLON.GUI.AdvancedDynamicTexture.CreateFullscreenUI("UI");
+
+            let generateDiagramButton = BABYLON.GUI.Button.CreateSimpleButton("btn", "Сгенерировать диаграмму");
+            generateDiagramButton.width = "150px"
+            generateDiagramButton.height = "50px";
+            generateDiagramButton.top = -10
+            generateDiagramButton.left = -10
+            generateDiagramButton.horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_RIGHT;
+            generateDiagramButton.verticalAlignment = BABYLON.GUI.Control.VERTICAL_ALIGNMENT_BOTTOM;
+            generateDiagramButton.color = "white";
+            generateDiagramButton.cornerRadius = 10;
+            generateDiagramButton.background = "gray";
+            generateDiagramButton.onPointerUpObservable.add(async () => {
+                let timeline = new BABYLON.MeshBuilder.CreateBox("timeline", {
+                    width: 0.05,
+                    height: 0.05,
+                    depth: height,
+                    updatable: true
+                });
+
+                let timelineMaterial = new BABYLON.StandardMaterial('timeline', scene);
+
+                timelineMaterial.diffuseColor = new BABYLON.Color3(0.0, 0.1, 0.1);
+                timelineMaterial.alpha = 0.1;
+
+                timeline.material = timelineMaterial;
+
+                timeline.position = new BABYLON.Vector3(width, 0.07, height / 2);
+
+                timeline.move("x", -3, 7);
+
+                await sleep(6000);
+
+                i = 30
+                while (timeline.position.x >= 0.25 && i > 0)
+                {
+                    console.log(timeline.position.x)
+                    let point = new BABYLON.Vector3(
+                        BABYLON.Scalar.RandomRange(timeline.position.x * 0.95, timeline.position.x),
+                        0.01,
+                        BABYLON.Scalar.RandomRange(0.1, height - 0.1)
+                    )
+
+                    areas.push(addArea(point, areas.length + 1));
+
+                    updateVoronoiAreas(areas, width, height);
+
+                    drawVoronoiDiagram(areas, scene);
+
+                    i--;
+                    await sleep(BABYLON.Scalar.RandomRange(400, 700));
+                }
+            });
+            advancedTexture.addControl(generateDiagramButton);
+
+            
+            let modalButton = BABYLON.GUI.Button.CreateSimpleButton("modal", "О программе");
+            modalButton.width = "150px"
+            modalButton.height = "50px";
+            modalButton.top = -70
+            modalButton.left = -10
+            modalButton.horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_RIGHT;
+            modalButton.verticalAlignment = BABYLON.GUI.Control.VERTICAL_ALIGNMENT_BOTTOM;
+            modalButton.color = "white";
+            modalButton.cornerRadius = 10;
+            modalButton.background = "gray";
+            modalButton.onPointerUpObservable.add(() => {
+                openModal();
+            })
+            advancedTexture.addControl(modalButton);
+
+            let clearAreasButton = BABYLON.GUI.Button.CreateSimpleButton("btn", "Очистить");
+            clearAreasButton.width = "150px"
+            clearAreasButton.height = "50px";
+            clearAreasButton.top = -10
+            clearAreasButton.left = -170
+            clearAreasButton.horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_RIGHT;
+            clearAreasButton.verticalAlignment = BABYLON.GUI.Control.VERTICAL_ALIGNMENT_BOTTOM;
+            clearAreasButton.color = "white";
+            clearAreasButton.cornerRadius = 10;
+            clearAreasButton.background = "gray";
+            clearAreasButton.onPointerUpObservable.add(() => {
+                for (let i = areas.length - 1; i >= 0; i--) {
+                    disposeArea(areas[i])
+
+                    areas.splice(i, 1);
+                }
+            })
+
+            advancedTexture.addControl(clearAreasButton);
+
+            return scene;
+        };
+
+        function drawVoronoiDiagram(areas, scene) {
+            for (let area of areas) {
+                    const clamp = (num, min, max) => Math.min(Math.max(num, min), max);
+
+                    let origHSV = BABYLON.Color3
+                        .FromArray(area.color.asArray())
+                        .toHSV();
+
+                    let colors = []
+
+                    for (let point of area.points) {
+                        let distance = getDistancePoint(point, area.point) * 1.2;
+
+                        let x = clamp(1 - distance, 0.1, 1.0);
+
+                        let color = BABYLON.Color4.FromColor3(
+                            BABYLON.Color3.FromHSV(origHSV.r, origHSV.g * (x + 0.8), x), clamp(x, 0.1, 0.8)
+                        )
+
+                        colors.push(color);
+                    }
+                    
+                    let lines = BABYLON.MeshBuilder.CreateLines(`area_line_${areas.length}`,
+                    {
+                        points: area.points,
+                        updatable: true,
+                        colors: colors,
+                        
+                    }, scene);
+
+                    lines.isPickable = false;
+
+                    area["lines"] = lines;
+                }
+        }
+
+        function addArea(point, index) {
+            let color = new BABYLON.Color4(
+                BABYLON.Scalar.RandomRange(0.2, 1.0),
+                BABYLON.Scalar.RandomRange(0.2, 1.0),
+                BABYLON.Scalar.RandomRange(0.2, 1.0),
+                0.5);
+
+            let material = new BABYLON.StandardMaterial(`area_${index}`, scene);
+
+            material.diffuseColor = BABYLON.Color3.Black();
+
+            let spherePoint = BABYLON.MeshBuilder.CreateSphere(`area_point_${index}`,
+                {
+                    segments: 8,
+                    diameter: 0.05
+                }, scene);
+
+            spherePoint.material = material;
+
+            spherePoint.position = point;
+
+            let area =
+            {
+                color,
+                point,
+                spherePoint,
+                points: [],
+            };
+
+            return area;
+        }
+
+        function disposeArea(area) {
+            area.spherePoint.dispose();
+            area.lines.dispose();
+        }
+
+        function getDistance(x, y) {
+            return Math.sqrt(x * x + y * y);
+        }
+
+        function getDistancePoint(p1, p2) {
+            return Math.sqrt(Math.pow(Math.abs(p2.x - p1.x), 2) + Math.pow(Math.abs(p2.z - p1.z), 2));
+        }
+
+        function updateVoronoiAreas(areas, width, height) {
+            if (areas.length == 0) {
+                return;
+            }
+
+            let dist1 = dist0 = j = 0
+
+            for (let area of areas) {
+                area.points = [];
+                area.lines?.dispose()
+            }
+
+            for (let y = 0; y < height; y += 0.005) {
+                for (let x = 0; x < width; x += 0.005) {
+                    dist0 = getDistance(height, width);
+
+                    j = -1;
+                    for (let i = 0; i < areas.length; i++) {
+                        dist1 = getDistance(areas[i].point.x - x, areas[i].point.z - y);
+                        if (dist1 < dist0) {
+                            dist0 = dist1;
+                            j = i;
+                        }
+                    }
+
+                    let area = areas[j];
+                    area.points.push(new BABYLON.Vector3(x, 0.01, y));
+                }
+            }
+        }
+
+
+
+        const scene = await createScene(); //Call the createScene function
+
+        // Register a render loop to repeatedly render the scene
+        engine.runRenderLoop(function () {
+            scene.render();
+        });
+
+        // Watch for browser/canvas resize events
+        window.addEventListener("resize", function () {
+            engine.resize();
+        });
+    }
+    </script>
+</body>
+
+</html>

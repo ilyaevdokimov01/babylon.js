@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+
+        <title>Babylon.js sample code</title>
+
+        <!-- Babylon.js -->
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.6.2/dat.gui.min.js"></script>
+        <script src="https://assets.babylonjs.com/generated/Assets.js"></script>
+        <script src="https://preview.babylonjs.com/ammo.js"></script>
+        <script src="https://preview.babylonjs.com/cannon.js"></script>
+        <script src="https://preview.babylonjs.com/Oimo.js"></script>
+        <script src="https://preview.babylonjs.com/earcut.min.js"></script>
+        <script src="https://preview.babylonjs.com/babylon.js"></script>
+        <script src="https://preview.babylonjs.com/materialsLibrary/babylonjs.materials.min.js"></script>
+        <script src="https://preview.babylonjs.com/proceduralTexturesLibrary/babylonjs.proceduralTextures.min.js"></script>
+        <script src="https://preview.babylonjs.com/postProcessesLibrary/babylonjs.postProcess.min.js"></script>
+        <script src="https://preview.babylonjs.com/loaders/babylonjs.loaders.js"></script>
+        <script src="https://preview.babylonjs.com/serializers/babylonjs.serializers.min.js"></script>
+        <script src="https://preview.babylonjs.com/gui/babylon.gui.min.js"></script>
+        <script src="https://preview.babylonjs.com/inspector/babylon.inspector.bundle.js"></script>
+
+        <style>
+            html, body {
+                overflow: hidden;
+                width: 100%;
+                height: 100%;
+                margin: 0;
+                padding: 0;
+            }
+
+            #renderCanvas {
+                width: 100%;
+                height: 100%;
+                touch-action: none;
+            }
+        </style>
+    </head>
+<body>
+    <canvas id="renderCanvas"></canvas>
+    <script>
+        var canvas = document.getElementById("renderCanvas");
+
+        var startRenderLoop = function (engine, canvas) {
+            engine.runRenderLoop(function () {
+                if (sceneToRender && sceneToRender.activeCamera) {
+                    sceneToRender.render();
+                }
+            });
+        }
+
+        var engine = null;
+        var scene = null;
+        var sceneToRender = null;
+        var createDefaultEngine = function() { return new BABYLON.Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true,  disableWebGL2Support: false}); };
+        const createScene = function () {
+                    // This creates a basic Babylon Scene object (non-mesh)
+                    const scene = new BABYLON.Scene(engine);
+        
+                    // This creates and positions a free camera (non-mesh)
+                    const camera = new BABYLON.ArcRotateCamera("Camera", 0, 0, 0, new BABYLON.Vector3(0, 0, -40), scene);
+        
+                    // This targets the camera to scene origin
+                    camera.setTarget(new BABYLON.Vector3(0, 5, 20));
+        
+                    // This attaches the camera to the canvas
+                    camera.attachControl(canvas, true);
+        
+                    // This creates a light, aiming 0,1,0 - to the sky (non-mesh)
+                    const light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 0, 0), scene);
+        
+                    // Default intensity is 1. Let's dim the light a small amount
+                    light.intensity = 5;
+        
+                    
+                    let points = [];  
+                    let myPoints = [];
+                    let arrVectors = [];
+                    let ch = [];
+                    let count = -1; //счетчик количества нажатий на кнопку 
+                    let h = [];
+                    let endPointsVector = [];
+                    var advancedTexture = BABYLON.GUI.AdvancedDynamicTexture.CreateFullscreenUI('UI');
+                    var line = new BABYLON.GUI.MultiLine();
+                    let nextVector = [];
+        
+        
+                    // Создание точек 
+                    for (i = 0; i < 15; i++) {
+                        points[i] = BABYLON.MeshBuilder.CreateSphere("sphere", { diameter: 0.4, segments: 32 }, scene);
+                    }
+        
+                    //Цвет точек
+                    const colorSp = new BABYLON.StandardMaterial("colorSp");
+                    colorSp.diffuseColor = new BABYLON.Color3.Yellow();
+                    for (i = 0; i < 15; i++) {
+                        points[i].material = colorSp;
+                    }
+        
+        
+                    // Позиционирование точек в пространтсве 
+                    points[0].position.x = 0;
+                    points[0].position.y = 0;
+        
+                    points[1].position.x = 10;
+                    points[1].position.y = 1;
+        
+                    points[2].position.x = -5;
+                    points[2].position.y = 10;
+        
+                    points[3].position.x = -3;
+                    points[3].position.y = 15;
+        
+                    points[4].position.x = 8;
+                    points[4].position.y = -3;
+        
+                    points[5].position.x = 10;
+                    points[5].position.y = 10;
+        
+                    points[6].position.x = 0;
+                    points[6].position.y = -7;
+        
+                    points[7].position.x = -10;
+                    points[7].position.y = -10;
+        
+                    points[8].position.x = -13;
+                    points[8].position.y = -3;
+        
+                    points[9].position.x = 3;
+                    points[9].position.y = 5;
+        
+                    points[10].position.x = -7;
+                    points[10].position.y = 5;
+        
+                    points[11].position.x = -13;
+                    points[11].position.y = 8;
+        
+                    points[12].position.x = 13;
+                    points[12].position.y = 4;
+        
+                    points[13].position.x = -7;
+                    points[13].position.y = -2;
+        
+                    points[14].position.x = 6;
+                    points[14].position.y = -8;
+        
+        
+                    //Вектора 
+        
+                    for (i = 0; i < 15; i++) {
+                        myPoints[i] = new BABYLON.Vector3(points[i].position.x, points[i].position.y, 0);
+                    }
+        
+                    function createVectors(pointStart) {
+                        let number = 0;
+        
+                        for (i = 0; i < 30; i++) {
+        
+                            if (i % 2 == 0) {
+                                arrVectors[i] = points[pointStart];
+                            }
+                            else {
+                                arrVectors[i] = points[number];
+                                number += 1;
+                            }
+                        }
+        
+                    }
+        
+                    function classify(vector, x1, y1) {
+                        return pr = (vector.x2 - vector.x1) * (y1 - vector.y1) - (vector.y2 - vector.y1) * (x1 - vector.x1);
+                    }
+        
+                    function StartPoint() {
+        
+                        let minI = 0; //номер нижней левой точки
+                        let min = myPoints[0].x;
+                        // ищем самую левую точку, просто сравнивая X
+                        for (let i = 1; i < myPoints.length; i++) {
+                            if (myPoints[i].x < min) {
+                                min = myPoints[i].x;
+                                minI = i;
+                            }
+                        }
+        
+                        createVectors(minI);
+                        points[minI].material = colorSp1;
+        
+                        // ch массив для сортировки точек против часовой стрелки, в нем
+                        //только номера ночек 
+                        for (let i = 0; i < 15; i++)
+                            ch[i] = i
+        
+                        ch[0] = minI;
+                        ch[minI] = 0;
+                    }
+        
+                    var advancedTexture1 = BABYLON.GUI.AdvancedDynamicTexture.CreateFullscreenUI("UI");
+                    var panel = new BABYLON.GUI.StackPanel();
+                    panel.isVertical = false;
+                    panel.width = "600px";
+                    panel.height = "1050px";
+                    panel.verticalAlignment = BABYLON.GUI.Control.VERTICAL_ALIGNMENT_BOTTOM;
+                    advancedTexture1.addControl(panel);
+        
+        
+                    var addButton = function (text, callback) {
+                        var button = BABYLON.GUI.Button.CreateSimpleButton("button", text);
+                        button.width = "140px";
+                        button.height = "40px";
+                        button.color = "white";
+                        button.background = "green";
+                        button.paddingLeft = "10px";
+                        button.paddingRight = "10px";
+                        button.onPointerUpObservable.add(function () {
+                            callback();
+                        });
+                        panel.addControl(button);
+                    }
+        
+        
+                    //смена цвета для точек входящих в оболочку
+                    const colorSp1 = new BABYLON.StandardMaterial("colorSp1");
+                    colorSp1.diffuseColor = new BABYLON.Color3.Red();
+        
+        
+                    addButton("Далее", function () {
+                        count++;
+        
+                        if (count == 0) {
+                            StartPoint();
+                            line.add(...arrVectors);
+                            advancedTexture.dispose();
+                            advancedTexture = BABYLON.GUI.AdvancedDynamicTexture.CreateFullscreenUI('UI');
+                            advancedTexture.addControl(line);
+                        }
+        
+                        // сортируем вершины против часовой стрелки
+                        for (let i = 1; i < ch.length - 1; i++) {
+                            for (let j = i + 1; j < ch.length; j++) {
+                                let cl = classify({
+                                    'x1': myPoints[ch[0]].x,
+                                    'y1': myPoints[ch[0]].y,
+                                    'x2': myPoints[ch[i]].x,
+                                    'y2': myPoints[ch[i]].y
+                                }, myPoints[ch[j]].x, myPoints[ch[j]].y) // функция classify считает векторное произведение.            
+        
+                                // если векторное произведение меньше 0, 
+                                // следовательно вершина j левее вершины i
+                                // Меняем их местами
+                                if (cl < 0) {
+                                    temp = ch[i];
+                                    ch[i] = ch[j];
+                                    ch[j] = temp;
+                                }
+                            }
+                        }
+        
+                        //записываем в стек вершины, которые точно входят в оболочку
+                        h[0] = ch[0];
+                        h[1] = ch[1];
+        
+                        //console.log(h);
+        
+                        let vectorH = [
+                            points[h[0]],
+                            points[h[1]],
+                        ];
+        
+                        if (count == 1) {
+                            advancedTexture.dispose(line);
+                            advancedTexture = BABYLON.GUI.AdvancedDynamicTexture.CreateFullscreenUI('UI');
+        
+                            line.add(...vectorH);
+                            advancedTexture.addControl(line);
+        
+                            points[h[1]].material = colorSp1;
+                        }
+        
+                        // мы проводим линию от последней точке к следующей а от неё к следующей (выходит угол)
+                        // если векторное произведение меньше 0, то угол впуклый в оболочку
+                        // значит точку не берем
+                        for (let i = 2; i < ch.length; i++) {
+                            if (count == i) {
+                                while (classify({
+                                    'x1': myPoints[h[h.length - 2]].x,
+                                    'y1': myPoints[h[h.length - 2]].y,
+                                    'x2': myPoints[h[h.length - 1]].x,
+                                    'y2': myPoints[h[h.length - 1]].y
+                                }, myPoints[ch[i]].x, myPoints[ch[i]].y) < 0) // если угол во внтурь уходит, убираем точку из оболочки
+                                {
+                                    h.pop(); //удаляем последний элемент из массива
+                                }
+        
+                                h.push(ch[i]); // добавляем новую точку в оболочку
+        
+        
+                                for (j = 0; j < h.length; j++) {
+                                    nextVector[j] = points[h[j]];
+                                }
+        
+                                advancedTexture.dispose(line);
+                                advancedTexture = BABYLON.GUI.AdvancedDynamicTexture.CreateFullscreenUI('UI');
+                                line.add(...nextVector);
+                                advancedTexture.addControl(line);
+                            }
+        
+        
+                            if(count == ch.length)
+                            {
+        
+                                for (let i = 0; i < h.length; i++) 
+                                {
+                                    endPointsVector[i] = myPoints[h[i]];
+                                }
+        
+                                endPointsVector.push(endPointsVector[0]);
+                                const lines = BABYLON.MeshBuilder.CreateLines("lines", { points: endPointsVector });
+                                points[h[i]].material = colorSp1;
+                            }
+                            
+                        }
+        
+        
+        
+                    });
+        
+                    return scene;
+                };
+                window.initFunction = async function() {
+                    
+                    
+                    var asyncEngineCreation = async function() {
+                        try {
+                        return createDefaultEngine();
+                        } catch(e) {
+                        console.log("the available createEngine function failed. Creating the default engine instead");
+                        return createDefaultEngine();
+                        }
+                    }
+
+                    window.engine = await asyncEngineCreation();
+        if (!engine) throw 'engine should not be null.';
+        startRenderLoop(engine, canvas);
+        window.scene = createScene();};
+        initFunction().then(() => {sceneToRender = scene                    
+        });
+
+        // Resize
+        window.addEventListener("resize", function () {
+            engine.resize();
+        });
+    </script>
+</body>
+</html>

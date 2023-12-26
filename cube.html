@@ -1,0 +1,76 @@
+const createScene = function () {
+
+    var scene = new BABYLON.Scene(engine);
+    var canvas = document.getElementById("renderCanvas");
+    var engine = new BABYLON.Engine(canvas, true);
+    
+    const camera = new BABYLON.ArcRotateCamera("camera", -Math.PI / 2, Math.PI / 2.5, 3, new BABYLON.Vector3(0, 0, 0));
+    camera.attachControl(canvas, true);
+    scene.clearColor = new BABYLON.Color3(1, 1, 1, 0.7)
+    
+    // Создание материала для каркасной модели
+    var material = new BABYLON.StandardMaterial("wireframeMaterial", scene);
+    material.wireframe = true;
+    
+    // Получение длины ребра от пользователя
+    var edgeLength = parseFloat(prompt("Введите длину ребра куба:"));
+    
+    // Создание каркасной модели куба
+    var box = BABYLON.MeshBuilder.CreateBox("box", {size: edgeLength}, scene);
+    box.material = material;
+    //box.material = wireframeMaterial; // синий цвет
+    
+    // Запуск рендера сцены
+    engine.runRenderLoop(function () {
+    scene.render();
+    });
+    
+    window.addEventListener("unload", function () {
+    box.dispose();
+    scene.dispose();
+    });
+    
+    createForm(box);
+    
+    return scene;
+    };
+    
+    const createForm = function (box) {
+    var form = new BABYLON.GUI.AdvancedDynamicTexture.CreateFullscreenUI("UI");
+    
+    // Создание и настройка элементов формы
+    var header = new BABYLON.GUI.TextBlock();
+    header.text = "Угол поворота";
+    header.color = "black";
+    header.fontSize = 24;
+    header.top = "10px";
+    form.addControl(header);
+    
+    var editBox = new BABYLON.GUI.InputText();
+    editBox.width = "200px";
+    editBox.height = "40px";
+    editBox.color = "white";
+    editBox.background = "black";
+    editBox.top = "50px";
+    form.addControl(editBox);
+    
+    var button = BABYLON.GUI.Button.CreateSimpleButton("copyButton", "Копировать куб");
+    button.width = "150px";
+    button.height = "40px";
+    button.color = "white";
+    button.background = "black";
+    button.top = "100px";
+    form.addControl(button);
+    
+    editBox.onTextChangedObservable.add(e=>{
+    var s = parseFloat(e.text);
+    box.rotation.y = s;
+    });
+    
+    button.onPointerUpObservable.add(e => {
+    // Создание копии куба
+    var copiedBox = box.clone("copiedBox");
+    // Установка новой позиции для копии куба
+    copiedBox.position = new BABYLON.Vector3(3, 0, 0); // Новая позиция копии куба
+    });
+    };
