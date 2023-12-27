@@ -3,7 +3,7 @@
     <head>
         <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
 
-        <title>Babylon.js sample code</title>
+        <title>Affine transformation</title>
 
         <!-- Babylon.js -->
         <script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.6.2/dat.gui.min.js"></script>
@@ -43,7 +43,7 @@
         // получаем канвас на странице
         var canvas = document.getElementById("renderCanvas");
 
-        // запускаем двигатель жиги
+        // запускаем двигатель
         var startRenderLoop = function (engine, canvas) {
             engine.runRenderLoop(function () {
                 if (sceneToRender && sceneToRender.activeCamera) {
@@ -168,7 +168,7 @@
                 if (!continueCreating) return;
                 if (pickResult.hit) {
                     const linepoints = [];
-
+                    //нижняя часть
                     if (isBottomSide) {
                         divided_y = pickResult.pickedPoint.y;
 
@@ -188,6 +188,7 @@
                             linepoints.push(new BABYLON.Vector3(-start_x - scale_x, pickResult.pickedPoint.y, 0))
                         }
                     }
+                    //верхняя часть
                     else {
                         divided_x = pickResult.pickedPoint.x;
 
@@ -211,6 +212,7 @@
             }
 
             // копирует массив для вращения
+            //бозовые точки + растяжение-сжатие
             function copy() {
                 return [
                     new BABYLON.Vector3(start_x, start_y, 0),
@@ -227,24 +229,24 @@
                 if (line) line.dispose();               
                 points_rot = Array.from(copy())
                 for (j = 0; j < 5; j++) {
-                    points_rot[j].x = points[j].x * Math.cos(alpha1 / 180 * Math.PI) + points[j].y * Math.sin(alpha1 / 180 * Math.PI)
+                    points_rot[j].x = points[j].x * Math.cos(alpha1 / 180 * Math.PI) + points[j].y * Math.sin(alpha1 / 180 * Math.PI) //перестройка точек x в щависимости от alpha
                 }
                 for (i = 0; i < 5; i++) {
-                    points_rot[i].y = - points[i].x * Math.sin(alpha1 / 180 * Math.PI) + points[i].y * Math.cos(alpha1 / 180 * Math.PI)
+                    points_rot[i].y = - points[i].x * Math.sin(alpha1 / 180 * Math.PI) + points[i].y * Math.cos(alpha1 / 180 * Math.PI) //перестройка точек y в щависимости от alpha
                 }
                 mesh = BABYLON.MeshBuilder.CreateLines("square", { points: points_rot }, scene);
             }
 
             //функция пересчета при изменении X
             function recalculate_x() {
-                // console.log("recaltulate x");
-
+                //чтобы фигура не дублировалась
                 mesh.dispose();
+                //убираем линию высота, если она есть
                 if (line) {
                     line.dispose();
                 }
 
-                // TODO нормальный scale_x при зеркалировании
+                // TODO нормальный scale_x при зеркалировании, если фигура справа
                 if (isRightSide) {
                     points[0].x = start_x;
                     points[1].x = start_x;
@@ -252,7 +254,7 @@
                     points[3].x = start_x + scale_x;
                     points[4].x = start_x;
                 }
-                // TODO нормальный scale_x при зеркалировании
+                // TODO нормальный scale_x при зеркалировании, если фигура слева
                 else {
                     points[0].x = -start_x;
                     points[1].x = -start_x;
@@ -261,12 +263,13 @@
                     points[4].x = -start_x;
                 }
 
-                rotate()
-                // mesh = BABYLON.MeshBuilder.CreateLines("square", { points: points }, scene);
+                rotate() //строим фигуру с учетом alpha
             }
             //функция пересчета при изменении Y
             function recalculate_y() {
+                //чтобы фигура не дублировалась
                 mesh.dispose();
+                //убираем линию высота, если она есть
                 if (line) {
                     line.dispose();
                 }
@@ -279,6 +282,7 @@
                     points[3].y = start_y;
                     points[4].y = start_y;
                 }
+                //если модель снизу
                 else {
                     points[0].y = -start_y;
                     points[1].y = -start_y - scale_y;
@@ -287,8 +291,7 @@
                     points[4].y = -start_y;
                 }
 
-                rotate()
-                // mesh = BABYLON.MeshBuilder.CreateLines("square", { points: points }, scene);
+                rotate() //строим фигуру с учетом alpha
             }
 
             // сам массив точек для построения
@@ -317,6 +320,7 @@
             let line = undefined;
 
             //обработка изменений в GUI
+            //Растяжение-сжатие
             gui.add(options, "scale_x", 0.1, 20).onChange(function (value) {
                 scale_x = value
                 recalculate_x()
@@ -326,12 +330,12 @@
                 scale_y = value
                 recalculate_y()
             });
-
+            //поворот оси
             gui.add(options, "alpha", 0, 360).onChange(function (value) {
                 alpha1 = value
                 rotate()
             });
-
+            //сдвиг оси
             gui.add(options, "start_x", -10.0, 10.0).onChange(function (value) {
                 start_x = value
                 recalculate_x()
@@ -343,7 +347,7 @@
 
             return scene;
         }
-
+        //Создание движка
         window.initFunction = async function() {
             var asyncEngineCreation = async function() {
                 try {
